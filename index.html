@@ -234,8 +234,9 @@ $("#exp").onclick = function(){
     navigator.share({ files: [file] }).then(function(){ msg.textContent = "書き出しました（「ファイルに保存」を選んだら、アーティファクトで そのファイルを選んでください）。"; exported(); }, function(e){ msg.textContent = (e && e.name === "AbortError") ? "やめました。" : "書き出せませんでした。「文字でコピー（予備）」を使ってください。"; });
     return;
   }
-  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "application/json" })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  msg.textContent = "書き出しました（" + name + "）。"; exported();
+  /* 共有が使えないときは、ファイルを開かない（ホーム画面から開いた画面では、開くと戻れなくなるおそれ・11-08 算数ステップ帳の相互チェック）。文字でコピーにする */
+  msg.textContent = "この iPad ではファイルで書き出せません。文字でコピーします。";
+  $("#copy").onclick();
 };
 $("#copy").onclick = function(){
   if (!DATA) return;
