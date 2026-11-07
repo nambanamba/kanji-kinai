@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>機内の社会の漢字</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="機内の漢字">
+<style>
+/* 機内用の入れ物（11-08 ユーザー「飛行機でやって再読込しても使える仕組み」・設計 sansu-flow\回答_オフラインで使う仕組み_2026-11-08.md）。
+   このページには語（問題・答え）を1つも入れない。アーティファクトの「オフライン用ファイルを作る」で作った .json を読みこみ、IndexedDB に入れる。
+   流れはアーティファクトの「iPadで書く（1問ずつ）」と同じ。途中は1画ごとに IndexedDB に保存。sw.js で入れ物ごと手元に置くので、ネットなしで開き直しても出る。
+   結果は「記録を書き出す」→ アーティファクトの ④「機内の結果を読みこむ」で、ふつうの紙の記録として入る */
+:root{--bg:#f3f4f8;--fg:#1b2030;--mute:#5b6378;--card:#fff;--line:#d6dae6;--accent:#2f4a8a;--accent-fg:#fff;--ok:#1f7a52;--ng:#b91c1c;
+  --f-text:"UD Digi Kyokasho N","Hiragino Mincho ProN","Yu Mincho",serif;--f-ui:"Hiragino Sans","Yu Gothic",system-ui,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:720px;padding:18px max(16px,env(safe-area-inset-left)) 40px;background:var(--bg);color:var(--fg);font:15px/1.6 var(--f-ui)}
+h1{font-size:1.3rem;margin:0 0 6px}
+h2{font-size:1.1rem;margin:0 0 6px}
+.sub{color:var(--mute);font-size:.9rem;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px}
+button{font:inherit;background:var(--accent);color:var(--accent-fg);border:0;border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer}
+button.sec{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button.small{min-height:36px;padding:4px 12px;font-size:.88rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sheet{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sheet .st{color:var(--mute);font-size:.92rem}
+.bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.bar .row{justify-content:space-between}
+.step{font-size:1rem;color:var(--mute);font-weight:700}
+.q{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.qh{display:flex;gap:10px;align-items:baseline}
+.qno{font-weight:700;color:var(--mute);min-width:1.6em;text-align:right}
+.qk{font-family:var(--f-text);font-weight:500;font-size:1.55rem;line-height:1.4}
+.note{font-family:var(--f-ui);font-size:.9rem;color:var(--mute)}
+.qm{font-family:var(--f-text);font-weight:500;font-size:.95rem;color:var(--mute);margin:2px 0 0 2.4em}
+canvas.pad{display:block;width:100%;height:260px;background:#fff;border:2px solid #444;border-radius:8px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;margin-top:8px}
+canvas.pad.pp{height:220px}
+.pc{position:relative}
+.pc .pl{position:absolute;left:8px;top:12px;font-size:.75rem;color:#94a3b8;pointer-events:none}
+.ans{margin-top:10px;border-left:4px solid var(--ok);padding:4px 0 4px 12px}
+.ans .aw{font-family:var(--f-text);font-weight:500;font-size:2.6rem;line-height:1.2}
+.ans .ak{font-family:var(--f-text);font-size:1rem;color:var(--mute)}
+.btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+.btns button{font-size:1.25rem;padding:14px 22px;min-width:9em}
+.btns .bok{background:var(--ok)}
+.btns .bng{background:#fff;color:var(--ng);border:2px solid var(--ng)}
+.pw{font-family:var(--f-text);font-weight:500;font-size:2.4rem;line-height:1.2}
+.ask{border:2px solid var(--fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:1.1rem;background:var(--card)}
+.win{font-size:1.3rem;color:var(--ok)}
+textarea{width:100%;min-height:90px;font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:6px}
+.msg{white-space:pre-line;margin:8px 0 0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<section id="home">
+  <h1>✈️ 機内の 社会の漢字</h1>
+  <p class="sub">ネットが なくても できるよ。とちゅうで 閉じても、つづきから できます。</p>
+  <div id="sheets" style="margin-top:12px"></div>
+  <div class="card" style="margin-top:24px">
+    <h2>おうちの方へ</h2>
+    <p class="sub" id="packInfo"></p>
+    <p class="sub"><b>乗る前（ネットのあるところで）:</b> ① このページを Safari の共有 →「ホーム画面に追加」 ② <b>ホーム画面のアイコンから開いて</b>、社会の漢字プリント（アーティファクト）の「① 紙を作る」→「オフライン用ファイルを作る」で保存したファイルを、下の「ファイルを読みこむ」で選ぶ。</p>
+    <div class="row" style="margin-top:8px"><label class="sec" style="display:inline-block;border:1px solid var(--accent);color:var(--accent);border-radius:10px;padding:9px 14px;cursor:pointer">ファイルを読みこむ <input type="file" id="packFile" accept=".json,application/json" hidden></label></div>
+    <p class="msg sub" id="packMsg"></p>
+    <p class="sub" style="margin-top:14px"><b>着いてから:</b>「記録を書き出す」でファイルを保存 → アーティファクトの「おうちの方」→「④ 引っ越し」→「機内の結果を読みこむ」で選ぶ（ふつうの紙と同じ記録として入ります。何回読みこんでも二重になりません）。書き出しても、この iPad の中の結果は消えません。</p>
+    <div class="row" style="margin-top:8px"><button class="sec" id="exp">記録を書き出す</button><button class="sec small" id="copy">文字でコピー（予備）</button></div>
+    <textarea id="code" readonly hidden style="margin-top:8px"></textarea>
+    <p class="msg sub" id="copyMsg"></p>
+  </div>
+</section>
+<section id="play" hidden>
+  <div class="bar"><div class="row"><span><b id="title"></b> <span class="step" id="step"></span></span><span class="row"><button class="small sec" id="back">← もどる</button><button class="small" id="endBtn">おわり</button></span></div></div>
+  <p class="sub" id="lead">1問ずつ やるよ。書いたら「答えを見る」（わからないときは 書かずに 押してね）。合っていたら「⭕ できた」、ちがったら「✕ できてない」を押して 練習しよう。</p>
+  <div id="box" style="margin-top:10px"></div>
+</section>
+<script>
+(function(){
+/* 保存先は IndexedDB の1つの箱（"pack" = 読みこんだファイル、"st" = 途中と結果）。DATA が無いあいだは「ファイルを読みこむ」だけ出す */
+var DATA = null, ST = { s: {} }, idb = null;
+function idbOpen(){ return new Promise(function(ok, ng){ var r = indexedDB.open("kinai_kanji", 1); r.onupgradeneeded = function(){ r.result.createObjectStore("kv"); }; r.onsuccess = function(){ ok(r.result); }; r.onerror = function(){ ng(r.error); }; }); }
+function idbGet(k){ return new Promise(function(ok, ng){ var q = idb.transaction("kv").objectStore("kv").get(k); q.onsuccess = function(){ ok(q.result); }; q.onerror = function(){ ng(q.error); }; }); }
+function idbPut(o){ return new Promise(function(ok, ng){ var t = idb.transaction("kv", "readwrite"), st = t.objectStore("kv"); Object.keys(o).forEach(function(k){ st.put(o[k], k); }); t.oncomplete = function(){ ok(); }; t.onerror = t.onabort = function(){ ng(t.error); }; }); }
+var saving = Promise.resolve(), saveErr = false;
+function save(){ if (!idb) return; var snap = JSON.parse(JSON.stringify(ST)); saving = saving.then(function(){ return idbPut({ st: snap }); }).then(function(){ saveErr = false; }, function(){ if (!saveErr) { saveErr = true; alert("保存できませんでした。おうちの人に 知らせてね。"); } }); }
+function $(q){ return document.querySelector(q); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function S(i){ var sid = DATA.sheets[i].sid; return ST.s[sid] = ST.s[sid] || { idx: 0, ph: "w", mk: {}, st: {}, cw: {}, done: false }; }
+var KYO = '"UD Digi Kyokasho N","Hiragino Mincho ProN",serif';
+
+/* ===== はじめの画面 ===== */
+function nDone(){ return DATA ? DATA.sheets.reduce(function(a, sh){ var s = ST.s[sh.sid]; return a + (s ? sh.w.filter(function(w){ return s.mk[w.id] === 0 || s.mk[w.id] === 1; }).length : 0); }, 0) : 0; }
+function home(){
+  cur = -1; $("#play").hidden = true; $("#home").hidden = false;
+  if (!DATA) { $("#sheets").innerHTML = '<div class="card"><b>まだ 問題が 入っていません。</b><br><span class="sub">おうちの人に「ファイルを読みこむ」をしてもらってね。</span></div>'; $("#packInfo").textContent = "まだファイルを読みこんでいません。"; return; }
+  var tot = DATA.sheets.reduce(function(a, s){ return a + s.w.length; }, 0), nd = nDone(), ne = nd - (ST.exported || 0);
+  $("#packInfo").textContent = "取り込み済み: " + DATA.date.slice(5).replace("-", "/") + " に作ったファイル・" + DATA.sheets.length + "枚 " + tot + "問。" + (nd ? "やった問題 " + nd + "問" + (ne > 0 ? "（まだ書き出していない " + ne + "問）" : "（書き出しずみ）") : "まだ1問もやっていません") + "。";
+  $("#sheets").innerHTML = DATA.sheets.map(function(sh, i){
+    var s = ST.s[sh.sid], n = sh.w.length, nd = s ? sh.w.filter(function(w){ return s.mk[w.id] === 0 || s.mk[w.id] === 1; }).length : 0, nok = s ? sh.w.filter(function(w){ return s.mk[w.id] === 1; }).length : 0;
+    var t = !s || (!nd && !s.idx) ? "まだ" : s.done ? "おわり（⭕ " + nok + " / " + nd + "）" : "とちゅう（" + nd + " / " + n + " 問）";
+    return '<div class="card sheet"><div><b>' + (i + 1) + '枚目</b>（' + n + '問）<div class="st">' + esc(t) + '</div></div><button data-go="' + i + '">' + (s && s.done ? "見る" : s && (nd || s.idx) ? "つづける" : "はじめる") + '</button></div>';
+  }).join("");
+  document.querySelectorAll("[data-go]").forEach(function(b){ b.onclick = function(){ open(+b.dataset.go); }; });
+  window.scrollTo(0, 0);
+}
+
+/* ===== 1問ずつ ===== */
+var cur = -1, act = null, TOUCH = {}, TOUCH_T = 0, penSeen = false;
+try { penSeen = localStorage.getItem("kinai_pen") === "1"; } catch (e) {}
+function guard(){ var t = Date.now() - TOUCH_T; return t < 1000 || (t < 3000 && Object.keys(TOUCH).length > 0); }
+window.addEventListener("pointerup", function(e){ if (TOUCH[e.pointerId]) { delete TOUCH[e.pointerId]; TOUCH_T = Date.now(); } }, true);
+window.addEventListener("pointercancel", function(e){ if (TOUCH[e.pointerId]) { delete TOUCH[e.pointerId]; TOUCH_T = Date.now(); } }, true);
+function open(i){ cur = i; $("#home").hidden = true; $("#play").hidden = false; build(); }
+function build(){
+  var sh = DATA.sheets[cur], s = S(cur), n = sh.w.length;
+  $("#title").textContent = (cur + 1) + "枚目";
+  if (s.done) { $("#step").textContent = ""; $("#endBtn").hidden = true; $("#lead").hidden = true; summary(); return; }
+  $("#endBtn").hidden = false; $("#lead").hidden = false;
+  var i = s.idx, w = sh.w[i], ph = s.ph;
+  $("#step").textContent = (i + 1) + " / " + n + " 問";
+  var h = '<div class="q"><div class="qh"><span class="qno">' + (i + 1) + '</span><span class="qk">' + esc(w.kana) + (w.note ? ' <span class="note">（' + esc(w.note) + '）</span>' : '') + '</span></div>' +
+    (w.mean ? '<div class="qm">' + esc(w.mean) + '</div>' : '') +
+    (ph === "w" ? '<div class="btns" style="margin:4px 0 0"><button id="show">答えを見る</button></div>' : '') +
+    '<canvas class="pad" data-cv="' + w.id + '"></canvas>' +
+    (ph === "w" ? '<div style="margin-top:6px"><button class="small sec" data-erase="' + w.id + '">このマスを消す</button></div>' : '');
+  if (ph !== "w") h += '<div class="ans"><div class="aw">' + esc(w.word) + '</div><div class="ak">' + esc(w.kana) + (w.full ? '　' + esc(w.full) : '') + '</div></div>';
+  if (ph === "a") h += '<div class="btns"><button class="bok" id="ok">⭕ できた</button><button class="bng" id="ng">✕ できてない</button></div>';
+  h += '</div>';
+  if (ph === "p") {
+    h += '<div class="q"><div><span class="pw">' + esc(w.word) + '</span> <span class="note">の練習</span></div>' +
+      ["① なぞる", "② じぶんで", "③ じぶんで"].map(function(lb, j){ return '<div class="pc"><span class="pl">' + lb + '</span><canvas class="pad pp" data-cv="p|' + w.id + '|' + j + '"></canvas></div>'; }).join("") +
+      '<div style="margin-top:6px"><button class="small sec" data-perase="' + w.id + '">この語を消す</button></div>' +
+      '<div class="btns"><button id="next">' + (i + 1 < n ? "練習できた → 次の問題" : "練習できた → おわり") + '</button></div></div>';
+  }
+  if (s.ask) {
+    var nd = sh.w.filter(function(x){ return s.mk[x.id] === 0 || s.mk[x.id] === 1; }).length;
+    h = '<div class="ask"><b>ここで おわりにする？</b><br>' + nd + '問 できたよ。' + (n - nd ? 'のこりの ' + (n - nd) + '問は、またこんど。' : '') +
+      '<div class="btns"><button id="endYes">おわりにする</button><button class="sec" id="endNo">つづける</button></div></div>' + h;
+  }
+  $("#box").innerHTML = h;
+  document.querySelectorAll("#box canvas.pad").forEach(wire);
+  document.querySelectorAll("#box canvas.pad").forEach(function(c){ draw(c.dataset.cv); });
+  document.querySelectorAll("[data-erase]").forEach(function(b){ b.onclick = function(){ var k = b.dataset.erase; delete s.st[k]; delete s.cw[k]; save(); draw(k); }; });
+  document.querySelectorAll("[data-perase]").forEach(function(b){ b.onclick = function(){ for (var j = 0; j < 3; j++) { var k = "p|" + b.dataset.perase + "|" + j; delete s.st[k]; delete s.cw[k]; draw(k); } save(); }; });
+  var b;
+  if ((b = $("#show"))) b.onclick = function(){ if (guard()) return; s.ph = "a"; save(); build(); };
+  if ((b = $("#ok"))) b.onclick = function(){ if (guard()) return; s.mk[w.id] = 1; next(); };
+  if ((b = $("#ng"))) b.onclick = function(){ if (guard()) return; s.mk[w.id] = 0; s.ph = "p"; save(); build(); };
+  if ((b = $("#next"))) b.onclick = function(){ next(); };
+  if ((b = $("#endYes"))) b.onclick = function(){ s.ask = false; s.done = true; save(); build(); };
+  if ((b = $("#endNo"))) b.onclick = function(){ s.ask = false; save(); build(); };
+  if (ph === "p" && document.fonts) document.fonts.load("500 60px " + KYO, w.word).then(function(){ draw("p|" + w.id + "|0"); }, function(){});
+  window.scrollTo(0, 0);
+}
+function next(){ var sh = DATA.sheets[cur], s = S(cur); if (s.idx + 1 < sh.w.length) { s.idx++; s.ph = "w"; } else s.done = true; save(); build(); }
+function summary(){
+  var sh = DATA.sheets[cur], s = S(cur), nd = sh.w.filter(function(x){ return s.mk[x.id] === 0 || s.mk[x.id] === 1; }), nok = nd.filter(function(x){ return s.mk[x.id] === 1; }).length;
+  $("#box").innerHTML = '<div class="card"><p class="win"><b>' + (nok === sh.w.length ? "ぜんぶ できました！" : "おわり。おつかれさま！") + '</b></p><p>⭕ ' + nok + ' 問・✕（練習した） ' + (nd.length - nok) + ' 問' + (sh.w.length > nd.length ? '・やらなかった ' + (sh.w.length - nd.length) + ' 問' : '') + '</p>' +
+    '<p class="sub">' + sh.w.map(function(x){ return (s.mk[x.id] === 1 ? "⭕ " : s.mk[x.id] === 0 ? "✕ " : "－ ") + esc(x.word); }).join("<br>") + '</p>' +
+    '<div class="btns"><button id="toHome">はじめの画面へ</button></div></div>';
+  $("#toHome").onclick = home;
+  window.scrollTo(0, 0);
+}
+$("#back").onclick = home;
+$("#endBtn").onclick = function(){ if (cur < 0) return; var s = S(cur); s.ask = true; save(); build(); };
+
+/* ===== 書くマス（アーティファクトの ipWire と同じ作り。ペンを使ったら指・手のひらでは書かない） ===== */
+function canWrite(k){ var s = S(cur); return String(k).indexOf("p|") === 0 ? s.ph === "p" : s.ph === "w"; }
+function scaleOf(k, W){ var cw = S(cur).cw[k]; return cw && W < cw ? W / cw : 1; }
+function cvOf(k){ return document.querySelector('#box canvas[data-cv="' + k + '"]'); }
+function draw(k){
+  var cv = cvOf(k); if (!cv) return;
+  var W = cv.clientWidth, H = cv.clientHeight, dpr = window.devicePixelRatio || 1; if (!W || !H) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  var g = cv.getContext("2d"), sc = scaleOf(k, W);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  var a = String(k).split("|");
+  if (a[0] === "p" && a[2] === "0") { var wd = DATA.sheets[cur].w.filter(function(x){ return x.id === a[1]; })[0].word, px = Math.min(H * 0.72, (W * 0.92) / Array.from(wd).length); g.save(); g.font = "500 " + px + "px " + KYO; g.fillStyle = "#c8c8c8"; g.textBaseline = "middle"; g.textAlign = "center"; g.fillText(wd, W / 2, H / 2); g.restore(); }
+  g.translate(0, (H - H * sc) / 2); g.scale(sc, sc);
+  g.strokeStyle = "#111"; g.fillStyle = "#111"; g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = 3;
+  (S(cur).st[k] || []).forEach(function(p){
+    if (p.length < 4) { g.beginPath(); g.arc(p[0], p[1], 1.5, 0, Math.PI * 2); g.fill(); return; }
+    g.beginPath(); g.moveTo(p[0], p[1]);
+    for (var i = 2; i < p.length - 2; i += 2) g.quadraticCurveTo(p[i], p[i + 1], (p[i] + p[i + 2]) / 2, (p[i + 1] + p[i + 3]) / 2);
+    g.lineTo(p[p.length - 2], p[p.length - 1]); g.stroke();
+  });
+}
+function wire(cv){
+  var id = cv.dataset.cv, geo = null, raf = 0;
+  cv.addEventListener("pointerdown", function(e){ TOUCH[e.pointerId] = 1; TOUCH_T = Date.now(); var a = document.activeElement; if (a && a.blur) a.blur(); });
+  cv.addEventListener("pointermove", function(e){ if (TOUCH[e.pointerId]) TOUCH_T = Date.now(); });
+  var pt = function(e){ return [Math.round((e.clientX - geo.l) / geo.s * 10) / 10, Math.round(((e.clientY - geo.t) - (geo.H - geo.H * geo.s) / 2) / geo.s * 10) / 10]; };
+  var fin = function(){ if (!act || act.id !== id) return; if (raf) { cancelAnimationFrame(raf); raf = 0; } act = null; geo = null; draw(id); save(); };
+  cv.addEventListener("pointerdown", function(e){
+    if (cur < 0 || !canWrite(id)) return;
+    var s = S(cur);
+    if (e.pointerType === "pen") { if (!penSeen) { penSeen = true; try { localStorage.setItem("kinai_pen", "1"); } catch (x) {} }
+      if (act && act.type !== "pen") { var arr = s.st[act.id] || [], j = arr.indexOf(act.s); if (j >= 0) arr.splice(j, 1); var o = act.id; act = null; draw(o); } }
+    else if (e.pointerType === "touch" && penSeen) { e.preventDefault(); return; }
+    if (act) { if (e.pointerType === "pen") { var ok = act.id; act = null; draw(ok); save(); } else return; }
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+    if (!s.cw[id]) s.cw[id] = cv.clientWidth;
+    var r = cv.getBoundingClientRect(); geo = { l: r.left, t: r.top, s: scaleOf(id, r.width), H: r.height };
+    act = { id: id, pid: e.pointerId, type: e.pointerType, s: pt(e) };
+    (s.st[id] = s.st[id] || []).push(act.s); draw(id);
+  });
+  cv.addEventListener("pointermove", function(e){
+    if (!act || act.pid !== e.pointerId || act.id !== id) return;
+    e.preventDefault();
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null; if (!evs || !evs.length) evs = [e];
+    evs.forEach(function(x){ var p = pt(x); act.s.push(p[0], p[1]); });
+    if (!raf) raf = requestAnimationFrame(function(){ raf = 0; draw(id); });
+  });
+  var end = function(e){ if (act && act.pid === e.pointerId) fin(); };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end); cv.addEventListener("lostpointercapture", end);
+  cv.addEventListener("touchstart", function(e){ e.preventDefault(); }, { passive: false });
+  cv.addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive: false });
+}
+document.addEventListener("visibilitychange", function(){ if (document.hidden) save(); });
+window.addEventListener("pagehide", save);
+
+/* ===== 記録ファイル（アーティファクトの ④「機内の結果を読みこむ」が読む形）。書き出しても、ここの結果は消さない ===== */
+function code(){
+  return JSON.stringify({ app: "kanji-shakai", v: 1, kind: "recs", from: "offline", date: DATA.date, created: Date.now(), sheets: DATA.sheets.map(function(sh){ var s = ST.s[sh.sid] || { mk: {} }, mk = {}; sh.w.forEach(function(w){ if (s.mk[w.id] === 0 || s.mk[w.id] === 1) mk[w.id] = s.mk[w.id]; }); return { sid: sh.sid, ids: sh.w.map(function(w){ return w.id; }), mk: mk }; }).filter(function(x){ return Object.keys(x.mk).length; }) });
+}
+function exported(){ ST.exported = nDone(); save(); home(); }
+$("#exp").onclick = function(){
+  if (!DATA || !nDone()) { $("#copyMsg").textContent = "まだ結果がありません。"; return; }
+  var t = code(), name = "kanji_kiroku_" + DATA.date + ".json", msg = $("#copyMsg");
+  var file = null; try { file = new File([t], name, { type: "application/json" }); } catch (e) {}
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file] }).then(function(){ msg.textContent = "書き出しました（「ファイルに保存」を選んだら、アーティファクトで そのファイルを選んでください）。"; exported(); }, function(e){ msg.textContent = (e && e.name === "AbortError") ? "やめました。" : "書き出せませんでした。「文字でコピー（予備）」を使ってください。"; });
+    return;
+  }
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "application/json" })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  msg.textContent = "書き出しました（" + name + "）。"; exported();
+};
+$("#copy").onclick = function(){
+  if (!DATA) return;
+  var t = code(), n = JSON.parse(t).sheets.length, ta = $("#code"); ta.value = t; ta.hidden = false;
+  var done = function(ok){ $("#copyMsg").textContent = (n ? n + "枚ぶんの結果を" : "まだ結果がありません。") + (n ? (ok ? "コピーしました。アーティファクトの ④「機内の結果を読みこむ」に貼ってください。" : "下の文字を長押しして、全部コピーしてください。") : ""); if (n && ok) exported(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ done(true); }, function(){ ta.select(); done(false); }); else { ta.select(); done(false); }
+};
+
+/* ===== ファイルを読みこむ（アーティファクトの「オフライン用ファイルを作る」で作った形）。失敗したら前の中身は消さない ===== */
+function packOk(p){ return p && p.app === "kanji-shakai" && p.v === 1 && p.kind === "pack" && /^\d{4}-\d{2}-\d{2}$/.test(p.date || "") && Array.isArray(p.sheets) && p.sheets.length && p.sheets.every(function(sh){ return /^kinai-[0-9-]+$/.test(sh.sid || "") && Array.isArray(sh.w) && sh.w.length && sh.w.every(function(w){ return w && w.id && w.word && w.kana; }); }); }
+$("#packFile").onchange = function(){
+  var f = this.files && this.files[0], msg = $("#packMsg"), inp = this; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var p = null; try { p = JSON.parse(r.result); } catch (e) {}
+    inp.value = "";
+    if (!packOk(p)) { msg.textContent = "このファイルは読めませんでした（前の中身はそのままです）。アーティファクトの「オフライン用ファイルを作る」で作ったファイルを選んでください。"; return; }
+    if (DATA && nDone() > (ST.exported || 0) && !confirm("まだ書き出していない結果が " + (nDone() - (ST.exported || 0)) + "問あります。新しいファイルに入れかえると、前のファイルの結果は書き出せなくなります。入れかえますか？")) { msg.textContent = "やめました（前の中身はそのままです）。"; return; }
+    var same = DATA && DATA.created === p.created, st2 = same ? ST : { s: {} };
+    idbPut({ pack: p, st: st2 }).then(function(){ DATA = p; ST = st2; msg.textContent = same ? "同じファイルです（結果はそのまま）。" : "読みこみました: " + p.sheets.length + "枚 " + p.sheets.reduce(function(a, s){ return a + s.w.length; }, 0) + "問。"; home(); }, function(){ msg.textContent = "保存できませんでした（前の中身はそのままです）。"; });
+  };
+  r.readAsText(f);
+};
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){});
+idbOpen().then(function(d){ idb = d; return Promise.all([idbGet("pack"), idbGet("st")]); }).then(function(a){ if (packOk(a[0])) { DATA = a[0]; ST = a[1] && a[1].s ? a[1] : { s: {} }; } home(); }, function(){ $("#sheets").innerHTML = '<div class="card">この画面では 保存ができません。おうちの人に 知らせてね。</div>'; });
+})();
+</script>
+</body>
+</html>
